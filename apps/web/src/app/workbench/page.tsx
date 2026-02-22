@@ -1,5 +1,6 @@
 "use client";
 
+<<<<<<< HEAD
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import anime from "animejs";
 import {
@@ -244,6 +245,30 @@ export default function WorkbenchPage() {
           <h2>Output</h2>
           <pre className="output-panel">{output || "Run an action to view response"}</pre>
         </section>
+=======
+import Link from "next/link";
+
+export default function WorkbenchPage() {
+  return (
+    <main className="page-shell">
+      <div className="panel card" style={{ maxWidth: 760 }}>
+        <h1 style={{ marginTop: 0 }}>API Workbench (Legacy Route)</h1>
+        <p className="muted">
+          The frontend now has production pages for onboarding, dashboard, chat, reviews, and settings. This route is
+          kept so older links do not 404.
+        </p>
+        <div className="row gap wrap" style={{ marginTop: 12 }}>
+          <Link className="btn btn-primary" href="/dashboard">
+            Dashboard
+          </Link>
+          <Link className="btn btn-soft" href="/chat">
+            Chat Coach
+          </Link>
+          <Link className="btn btn-outline" href="/">
+            Landing Page
+          </Link>
+        </div>
+>>>>>>> 434a4dc250140f8115d449a4b81faf63575c1fba
       </div>
     </main>
   );

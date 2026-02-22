@@ -1,0 +1,57 @@
+{
+  "type": "webhook",
+  "name": "delete_habit",
+  "description": "Deactivate an existing habit from the call.",
+  "response_timeout_secs": 8,
+  "disable_interruptions": true,
+  "force_pre_tool_speech": true,
+  "assignments": [],
+  "tool_call_sound_behavior": "always",
+  "tool_error_handling_mode": "auto",
+  "dynamic_variables": {
+    "dynamicVariablePlaceholders": {}
+  },
+  "execution_mode": "immediate",
+  "api_schema": {
+    "request_headers": {
+      "Content-Type": "application/json",
+      "x-tool-api-key": "{{TOOL_API_KEY}}"
+    },
+    "url": "https://api-production-8bf7.up.railway.app/v1/tools/delete-habit",
+    "method": "POST",
+    "path_params_schema": {},
+    "request_body_schema": {
+      "type": "object",
+      "required": [
+        "userId",
+        "habitId"
+      ],
+      "description": "",
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "description": "",
+          "is_system_provided": false,
+          "dynamic_variable": "user_id",
+          "constant_value": ""
+        },
+        "habit_id": {
+          "type": "string",
+          "description": "Habit UUID to deactivate.",
+          "is_system_provided": false,
+          "dynamic_variable": "",
+          "constant_value": ""
+        },
+        "habit_title": {
+          "type": "string",
+          "description": "Optional habit title if the agent needs a human-readable confirmation.",
+          "is_system_provided": false,
+          "dynamic_variable": "",
+          "constant_value": ""
+        }
+      }
+    },
+    "content_type": "application/json"
+  },
+  "tool_call_sound": "typing"
+}
