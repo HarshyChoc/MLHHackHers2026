@@ -7,12 +7,14 @@ const useSsl = /sslmode=|supabase\.(co|com)/i.test(databaseUrl);
 const rejectUnauthorized =
   (process.env.DATABASE_SSL_REJECT_UNAUTHORIZED ??
     (databaseUrl.includes("pooler.supabase.com") ? "false" : "true")) !== "false";
+const poolMax = Number(process.env.WORKER_DATABASE_POOL_MAX ?? process.env.DATABASE_POOL_MAX ?? 2);
 
 const pool = new Pool({
   connectionString: databaseUrl,
   ssl: useSsl ? { rejectUnauthorized } : undefined,
-  max: 8,
-  idleTimeoutMillis: 30_000
+  max: Number.isFinite(poolMax) ? Math.max(1, Math.min(10, Math.trunc(poolMax))) : 2,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 10_000
 });
 
 type CheckinRow = {
@@ -21,6 +23,124 @@ type CheckinRow = {
   scheduled_at_utc: string;
   attempt_count: number;
 };
+
+type CallScheduleTemplateRow = {
+  user_id: string;
+  timezone: string;
+  windows: Array<Record<string, unknown>>;
+};
+
+function addDays(dateInput: string, days: number): string {
+  const d = new Date(`${dateInput}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function dateInTimeZone(date: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function dayOfWeek(dateInput: string): number {
+  return new Date(`${dateInput}T00:00:00Z`).getUTCDay();
+}
+
+function pickExactTime(windowObj: Record<string, unknown>): string | null {
+  const timeLocal = typeof windowObj.time_local === "string" ? windowObj.time_local : null;
+  if (timeLocal && /^\d{2}:\d{2}$/.test(timeLocal)) return timeLocal;
+  const startLocal = typeof windowObj.start_local === "string" ? windowObj.start_local : null;
+  if (startLocal && /^\d{2}:\d{2}$/.test(startLocal)) return startLocal;
+  return null;
+}
+
+async function toUtcIsoFromLocal(dateLocal: string, timeLocal: string, timeZone: string): Promise<string | null> {
+  const row = await pool.query<{ ts: string }>(
+    `select (($1 || ' ' || $2)::timestamp at time zone $3)::text as ts`,
+    [dateLocal, timeLocal, timeZone]
+  );
+  const ts = row.rows[0]?.ts;
+  if (!ts) return null;
+  const parsed = new Date(ts);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+async function createCheckinEventIfMissing(params: {
+  userId: string;
+  scheduledAtUtc: string;
+  type?: "call" | "chat";
+}): Promise<boolean> {
+  const result = await pool.query<{ inserted: boolean }>(
+    `insert into checkin_events (user_id, scheduled_at_utc, type, status, attempt_count)
+     select $1, $2::timestamptz, $3, 'scheduled', 0
+     where not exists (
+       select 1
+       from checkin_events
+       where user_id = $1
+         and type = $3
+         and scheduled_at_utc = $2::timestamptz
+     )
+     returning true as inserted`,
+    [params.userId, params.scheduledAtUtc, params.type ?? "call"]
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function materializeUpcomingCallCheckins(daysAhead = 14): Promise<number> {
+  const rows = await pool.query<CallScheduleTemplateRow>(
+    `select s.user_id, u.timezone, s.windows
+     from schedules s
+     join users u on u.id = s.user_id
+     where s.type = 'call'`
+  );
+
+  let inserted = 0;
+  const now = Date.now();
+
+  for (const row of rows.rows) {
+    const userTimezone = row.timezone || "UTC";
+    const localToday = dateInTimeZone(new Date(), userTimezone);
+    const windows = Array.isArray(row.windows) ? row.windows : [];
+
+    for (const windowObj of windows) {
+      if (!windowObj || typeof windowObj !== "object") continue;
+      const exactTime = pickExactTime(windowObj);
+      if (!exactTime) continue;
+
+      const daysRaw = Array.isArray((windowObj as { days_of_week?: unknown }).days_of_week)
+        ? ((windowObj as { days_of_week: unknown[] }).days_of_week as unknown[])
+        : null;
+      const allowedDays = new Set(
+        (daysRaw ?? [0, 1, 2, 3, 4, 5, 6])
+          .map((v) => Number(v))
+          .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6)
+      );
+
+      for (let offset = 0; offset <= daysAhead; offset += 1) {
+        const candidateLocalDate = addDays(localToday, offset);
+        if (!allowedDays.has(dayOfWeek(candidateLocalDate))) continue;
+
+        const utcIso = await toUtcIsoFromLocal(candidateLocalDate, exactTime, userTimezone);
+        if (!utcIso) continue;
+        if (new Date(utcIso).getTime() <= now) continue;
+
+        const didInsert = await createCheckinEventIfMissing({
+          userId: row.user_id,
+          scheduledAtUtc: utcIso,
+          type: "call"
+        });
+        if (didInsert) inserted += 1;
+      }
+    }
+  }
+
+  return inserted;
+}
 
 export async function claimDueCheckins(limit: number): Promise<CheckinRow[]> {
   const result = await pool.query<CheckinRow>(

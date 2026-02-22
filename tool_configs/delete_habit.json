@@ -1,7 +1,7 @@
 {
   "type": "webhook",
-  "name": "set_commitment",
-  "description": "Store user commitment from the call.",
+  "name": "delete_habit",
+  "description": "Deactivate an existing habit from the call.",
   "response_timeout_secs": 8,
   "disable_interruptions": true,
   "force_pre_tool_speech": true,
@@ -15,34 +15,36 @@
   "api_schema": {
     "request_headers": {
       "Content-Type": "application/json",
-      "x-tool-api-key": "b8ca616325a718d6634728c74bc78c8fa43315e0dfb29c6a"
+      "x-tool-api-key": "{{TOOL_API_KEY}}"
     },
-    "url": "https://api-production-8bf7.up.railway.app/v1/tools/set-commitment",
+    "url": "https://api-production-8bf7.up.railway.app/v1/tools/delete-habit",
     "method": "POST",
     "path_params_schema": {},
     "request_body_schema": {
       "type": "object",
       "required": [
         "userId",
-        "commitmentText",
-        "dueDateLocal"
+        "habitId"
       ],
       "description": "",
       "properties": {
         "user_id": {
           "type": "string",
-          "dynamic_variable": "user_id"
+          "description": "",
+          "is_system_provided": false,
+          "dynamic_variable": "user_id",
+          "constant_value": ""
         },
-        "commitment_text": {
+        "habit_id": {
           "type": "string",
-          "description": "Commitment message.",
+          "description": "Habit UUID to deactivate.",
           "is_system_provided": false,
           "dynamic_variable": "",
           "constant_value": ""
         },
-        "due_date_local": {
+        "habit_title": {
           "type": "string",
-          "description": "Due date in YYYY-MM-DD.",
+          "description": "Optional habit title if the agent needs a human-readable confirmation.",
           "is_system_provided": false,
           "dynamic_variable": "",
           "constant_value": ""

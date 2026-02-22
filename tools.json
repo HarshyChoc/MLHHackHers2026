@@ -22,13 +22,18 @@
         },
         {
             "type": "webhook",
-            "config": "tool_configs/set_commitment.json",
+            "config": "tool_configs/create_habit.json",
             "id": "tool_3401kj1p3c1cf0a9yn04smyf4r97"
         },
         {
             "type": "webhook",
             "config": "tool_configs/reschedule_checkin.json",
             "id": "tool_8701kj1p3cjhebvrnpr56tkgh1kf"
+        },
+        {
+            "type": "webhook",
+            "config": "tool_configs/delete_habit.json",
+            "id": "tool_6601kj2rysh7es4vvn5errgf0yhb"
         }
     ]
 }

@@ -1,0 +1,116 @@
+{
+  "type": "webhook",
+  "name": "create_habit",
+  "description": "Create a new recurring habit from the call.",
+  "response_timeout_secs": 8,
+  "disable_interruptions": true,
+  "force_pre_tool_speech": true,
+  "assignments": [],
+  "tool_call_sound_behavior": "always",
+  "tool_error_handling_mode": "auto",
+  "dynamic_variables": {
+    "dynamicVariablePlaceholders": {}
+  },
+  "execution_mode": "immediate",
+  "api_schema": {
+    "request_headers": {
+      "Content-Type": "application/json",
+      "x-tool-api-key": "{{TOOL_API_KEY}}"
+    },
+    "url": "https://api-production-8bf7.up.railway.app/v1/tools/create-habit",
+    "method": "POST",
+    "path_params_schema": {},
+    "request_body_schema": {
+      "type": "object",
+      "required": [
+        "userId",
+        "title"
+      ],
+      "description": "",
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "description": "",
+          "is_system_provided": false,
+          "dynamic_variable": "user_id",
+          "constant_value": ""
+        },
+        "title": {
+          "type": "string",
+          "description": "Habit name to create.",
+          "is_system_provided": false,
+          "dynamic_variable": "",
+          "constant_value": ""
+        },
+        "frequency_kind": {
+          "type": "string",
+          "description": "daily | weekdays | custom",
+          "enum": [
+            "daily",
+            "weekdays",
+            "custom"
+          ],
+          "is_system_provided": false,
+          "dynamic_variable": "",
+          "constant_value": ""
+        },
+        "days_of_week_csv": {
+          "type": "string",
+          "description": "Optional for custom cadence, CSV days 0-6 (Sun-Sat), e.g. 1,3,5.",
+          "is_system_provided": false,
+          "dynamic_variable": "",
+          "constant_value": ""
+        },
+        "start_local": {
+          "type": "string",
+          "description": "Start time HH:mm local.",
+          "is_system_provided": false,
+          "dynamic_variable": "",
+          "constant_value": ""
+        },
+        "end_local": {
+          "type": "string",
+          "description": "End time HH:mm local.",
+          "is_system_provided": false,
+          "dynamic_variable": "",
+          "constant_value": ""
+        },
+        "difficulty": {
+          "type": "number",
+          "description": "Difficulty 1-10.",
+          "is_system_provided": false,
+          "dynamic_variable": "",
+          "constant_value": ""
+        },
+        "measurement_type": {
+          "type": "string",
+          "description": "yes_no | count | duration_minutes",
+          "enum": [
+            "yes_no",
+            "count",
+            "duration_minutes"
+          ],
+          "is_system_provided": false,
+          "dynamic_variable": "",
+          "constant_value": ""
+        },
+        "target_value": {
+          "type": "number",
+          "description": "Target count or minutes when applicable.",
+          "is_system_provided": false,
+          "dynamic_variable": "",
+          "constant_value": ""
+        },
+        "unit": {
+          "type": "string",
+          "description": "Unit label, e.g. done, reps, min.",
+          "is_system_provided": false,
+          "dynamic_variable": "",
+          "constant_value": ""
+        }
+      }
+    },
+    "content_type": "application/json"
+  },
+  "tool_call_sound": "typing"
+}

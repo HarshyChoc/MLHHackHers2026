@@ -11,12 +11,14 @@ const useSsl = /sslmode=|supabase\.(co|com)/i.test(databaseUrl);
 const rejectUnauthorized =
   (process.env.DATABASE_SSL_REJECT_UNAUTHORIZED ??
     (databaseUrl.includes("pooler.supabase.com") ? "false" : "true")) !== "false";
+const poolMax = Number(process.env.DATABASE_POOL_MAX ?? 4);
 
 const pool = new Pool({
   connectionString: databaseUrl,
   ssl: useSsl ? { rejectUnauthorized } : undefined,
-  max: 10,
-  idleTimeoutMillis: 30_000
+  max: Number.isFinite(poolMax) ? Math.max(1, Math.min(20, Math.trunc(poolMax))) : 4,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 10_000
 });
 
 export async function query<T extends QueryResultRow>(text: string, params: unknown[] = []): Promise<T[]> {

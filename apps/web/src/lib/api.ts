@@ -776,19 +776,6 @@ const mockApi = {
       };
       state.schedules = state.schedules.filter((s) => !(s.user_id === user.id && s.type === payload.type));
       state.schedules.push(record);
-      if (payload.type === "call") {
-        state.checkin_events.push({
-          id: randomId("evt"),
-          user_id: user.id,
-          type: "call",
-          status: "scheduled",
-          scheduled_at_utc: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-          attempt_count: 0,
-          provider_call_id: null,
-          created_at: ts,
-          updated_at: ts
-        });
-      }
       return clone(record) as Schedule;
     });
   },

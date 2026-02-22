@@ -23,6 +23,7 @@ export default function SettingsPage() {
   const [scheduleForm, setScheduleForm] = useState({
     type: "call" as "call" | "chat",
     days_csv: "1,2,3,4,5",
+    call_time_local: "18:00",
     start_local: "09:00",
     end_local: "18:00",
     cadence_kind: "weekly",
@@ -80,13 +81,21 @@ export default function SettingsPage() {
     setBusy("schedule");
     setToast(null);
     try {
-      const windows = [
-        {
-          days_of_week: parseDaysCsv(scheduleForm.days_csv),
-          start_local: scheduleForm.start_local,
-          end_local: scheduleForm.end_local
-        }
-      ];
+      const windows =
+        scheduleForm.type === "call"
+          ? [
+              {
+                days_of_week: parseDaysCsv(scheduleForm.days_csv),
+                time_local: scheduleForm.call_time_local
+              }
+            ]
+          : [
+              {
+                days_of_week: parseDaysCsv(scheduleForm.days_csv),
+                start_local: scheduleForm.start_local,
+                end_local: scheduleForm.end_local
+              }
+            ];
       const cadence = {
         kind: scheduleForm.cadence_kind,
         interval: Number(scheduleForm.interval)
@@ -142,6 +151,12 @@ export default function SettingsPage() {
     setScheduleForm({
       type: schedule.type,
       days_csv: days.map(String).join(","),
+      call_time_local:
+        typeof firstWindow.time_local === "string"
+          ? firstWindow.time_local
+          : typeof firstWindow.start_local === "string"
+            ? firstWindow.start_local
+            : "18:00",
       start_local: typeof firstWindow.start_local === "string" ? firstWindow.start_local : "09:00",
       end_local: typeof firstWindow.end_local === "string" ? firstWindow.end_local : "18:00",
       cadence_kind: String((schedule.cadence as Record<string, unknown>).kind ?? "weekly"),
@@ -260,16 +275,28 @@ export default function SettingsPage() {
                   <input id="days-csv" value={scheduleForm.days_csv} onChange={(e) => setScheduleForm({ ...scheduleForm, days_csv: e.target.value })} />
                 </div>
               </div>
-              <div className="inline-fields">
+              {scheduleForm.type === "call" ? (
                 <div className="field" style={{ marginBottom: 0 }}>
-                  <label htmlFor="start-window">Window start</label>
-                  <input id="start-window" type="time" value={scheduleForm.start_local} onChange={(e) => setScheduleForm({ ...scheduleForm, start_local: e.target.value })} />
+                  <label htmlFor="call-time-local">Call time (exact)</label>
+                  <input
+                    id="call-time-local"
+                    type="time"
+                    value={scheduleForm.call_time_local}
+                    onChange={(e) => setScheduleForm({ ...scheduleForm, call_time_local: e.target.value })}
+                  />
                 </div>
-                <div className="field" style={{ marginBottom: 0 }}>
-                  <label htmlFor="end-window">Window end</label>
-                  <input id="end-window" type="time" value={scheduleForm.end_local} onChange={(e) => setScheduleForm({ ...scheduleForm, end_local: e.target.value })} />
+              ) : (
+                <div className="inline-fields">
+                  <div className="field" style={{ marginBottom: 0 }}>
+                    <label htmlFor="start-window">Window start</label>
+                    <input id="start-window" type="time" value={scheduleForm.start_local} onChange={(e) => setScheduleForm({ ...scheduleForm, start_local: e.target.value })} />
+                  </div>
+                  <div className="field" style={{ marginBottom: 0 }}>
+                    <label htmlFor="end-window">Window end</label>
+                    <input id="end-window" type="time" value={scheduleForm.end_local} onChange={(e) => setScheduleForm({ ...scheduleForm, end_local: e.target.value })} />
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="inline-fields">
                 <div className="field" style={{ marginBottom: 0 }}>
                   <label htmlFor="cadence-kind">Cadence kind</label>
@@ -335,7 +362,9 @@ export default function SettingsPage() {
                         <span className="badge mono">{schedule.id.slice(0, 8)}</span>
                       </div>
                       <div className="muted compact">
-                        Days {days} • {String(window0.start_local ?? "--:--")}-{String(window0.end_local ?? "--:--")}
+                        Days {days} • {schedule.type === "call"
+                          ? `at ${String(window0.time_local ?? window0.start_local ?? "--:--")}`
+                          : `${String(window0.start_local ?? "--:--")}-${String(window0.end_local ?? "--:--")}`}
                       </div>
                       <div className="muted compact">
                         Cadence: {String((schedule.cadence as Record<string, unknown>).kind ?? "custom")} every {String((schedule.cadence as Record<string, unknown>).interval ?? 1)}

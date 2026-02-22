@@ -70,7 +70,7 @@
       },
       "disable_first_message_interruptions": true,
       "prompt": {
-        "prompt": "You are Jeeyan, a warm and practical goal coach calling for a quick check-in.\n\nSpeak naturally on the phone:\n- sound human, conversational, and concise\n- use contractions and short spoken phrases\n- ask one question at a time\n- avoid robotic or overly formal wording\n\nLatency behavior:\n- start responding quickly\n- if a tool or lookup may take a moment, immediately say a short acknowledgement (for example: \"Yeah, got it.\" or \"Okay, one sec.\")\n- for tool turns: acknowledge -> run tool -> state result\n- avoid dead air and avoid long filler\n\nCall behavior:\n- always use tools for user state (do not guess)\n- dynamic variable `user_id` is injected at runtime\n- call get_context_pack and get_today_plan before discussing progress\n- log habit outcomes with log_habit\n- use report_blocker for obstacles\n- use set_commitment for one clear next commitment\n- use reschedule_checkin if they ask to move the next call\n\nPhone robustness:\n- if audio is unclear/noisy, ask a short clarification instead of guessing\n- confirm key details briefly when uncertain\n- do not cut the user off unless they clearly finished\n\n\nTool-turn pacing:\n- For reads/checks (like getting context or today plan), give a very short acknowledgement immediately and perform tool calls right away.\n- If multiple read tools are needed, call them in parallel.\n- Do not leave silent gaps before or between tool actions.\n",
+        "prompt": "You are Jeeyan, a warm and practical goal coach calling for a quick check-in.\n\nSpeak naturally on the phone:\n- sound human, conversational, and concise\n- use contractions and short spoken phrases\n- ask one question at a time\n- avoid robotic or overly formal wording\n\nLatency behavior:\n- start responding quickly\n- if a tool or lookup may take a moment, immediately say a short acknowledgement (for example: \"Yeah, got it.\" or \"Okay, one sec.\")\n- for tool turns: acknowledge -> run tool -> state result\n- avoid dead air and avoid long filler\n\nCall behavior:\n- always use tools for user state (do not guess)\n- dynamic variable `user_id` is injected at runtime\n- call get_context_pack and get_today_plan before discussing progress\n- log habit outcomes with log_habit\n- use report_blocker for obstacles\n- use create_habit when the user wants to add a recurring habit\n- use delete_habit when the user wants to remove/deactivate a habit\n- use reschedule_checkin if they ask to move the next call\n\nPhone robustness:\n- if audio is unclear/noisy, ask a short clarification instead of guessing\n- confirm key details briefly when uncertain\n- do not cut the user off unless they clearly finished\n\n\nTool-turn pacing:\n- For reads/checks (like getting context or today plan), give a very short acknowledgement immediately and perform tool calls right away.\n- If multiple read tools are needed, call them in parallel.\n- Do not leave silent gaps before or between tool actions.\n",
         "llm": "gpt-4o-mini",
         "temperature": 0.22,
         "max_tokens": -1,
@@ -80,7 +80,8 @@
           "tool_0901kj1p3b04ebbt79tntfjf3y6x",
           "tool_1101kj1p3bgmevrr0sgbaksya1wq",
           "tool_3401kj1p3c1cf0a9yn04smyf4r97",
-          "tool_8701kj1p3cjhebvrnpr56tkgh1kf"
+          "tool_8701kj1p3cjhebvrnpr56tkgh1kf",
+          "tool_6601kj2rysh7es4vvn5errgf0yhb"
         ],
         "built_in_tools": {
           "search_documentation": null
@@ -124,7 +125,7 @@
             "api_schema": {
               "request_headers": {
                 "Content-Type": "application/json",
-                "x-tool-api-key": "b8ca616325a718d6634728c74bc78c8fa43315e0dfb29c6a"
+                "x-tool-api-key": "{{TOOL_API_KEY}}"
               },
               "url": "https://api-production-8bf7.up.railway.app/v1/tools/get-context-pack",
               "method": "POST",
@@ -166,7 +167,7 @@
             "api_schema": {
               "request_headers": {
                 "Content-Type": "application/json",
-                "x-tool-api-key": "b8ca616325a718d6634728c74bc78c8fa43315e0dfb29c6a"
+                "x-tool-api-key": "{{TOOL_API_KEY}}"
               },
               "url": "https://api-production-8bf7.up.railway.app/v1/tools/get-today-plan",
               "method": "POST",
@@ -208,7 +209,7 @@
             "api_schema": {
               "request_headers": {
                 "Content-Type": "application/json",
-                "x-tool-api-key": "b8ca616325a718d6634728c74bc78c8fa43315e0dfb29c6a"
+                "x-tool-api-key": "{{TOOL_API_KEY}}"
               },
               "url": "https://api-production-8bf7.up.railway.app/v1/tools/log-habit",
               "method": "POST",
@@ -287,7 +288,7 @@
             "api_schema": {
               "request_headers": {
                 "Content-Type": "application/json",
-                "x-tool-api-key": "b8ca616325a718d6634728c74bc78c8fa43315e0dfb29c6a"
+                "x-tool-api-key": "{{TOOL_API_KEY}}"
               },
               "url": "https://api-production-8bf7.up.railway.app/v1/tools/report-blocker",
               "method": "POST",
@@ -334,8 +335,8 @@
           },
           {
             "type": "webhook",
-            "name": "set_commitment",
-            "description": "Store user commitment from the call.",
+            "name": "create_habit",
+            "description": "Create a new recurring habit from the call.",
             "response_timeout_secs": 8,
             "disable_interruptions": true,
             "force_pre_tool_speech": true,
@@ -349,17 +350,16 @@
             "api_schema": {
               "request_headers": {
                 "Content-Type": "application/json",
-                "x-tool-api-key": "b8ca616325a718d6634728c74bc78c8fa43315e0dfb29c6a"
+                "x-tool-api-key": "{{TOOL_API_KEY}}"
               },
-              "url": "https://api-production-8bf7.up.railway.app/v1/tools/set-commitment",
+              "url": "https://api-production-8bf7.up.railway.app/v1/tools/create-habit",
               "method": "POST",
               "path_params_schema": {},
               "request_body_schema": {
                 "type": "object",
                 "required": [
                   "userId",
-                  "commitmentText",
-                  "dueDateLocal"
+                  "title"
                 ],
                 "description": "",
                 "properties": {
@@ -370,16 +370,106 @@
                     "dynamic_variable": "user_id",
                     "constant_value": ""
                   },
-                  "commitment_text": {
+                  "title": {
                     "type": "string",
-                    "description": "Commitment message.",
+                    "description": "Habit title.",
                     "is_system_provided": false,
                     "dynamic_variable": "",
                     "constant_value": ""
                   },
-                  "due_date_local": {
+                  "frequency_kind": {
                     "type": "string",
-                    "description": "Due date in YYYY-MM-DD.",
+                    "description": "daily | weekdays | custom",
+                    "enum": [
+                      "daily",
+                      "weekdays",
+                      "custom"
+                    ],
+                    "is_system_provided": false,
+                    "dynamic_variable": "",
+                    "constant_value": ""
+                  },
+                  "days_of_week_csv": {
+                    "type": "string",
+                    "description": "Optional for custom cadence, CSV days 0-6 (Sun-Sat).",
+                    "is_system_provided": false,
+                    "dynamic_variable": "",
+                    "constant_value": ""
+                  },
+                  "start_local": {
+                    "type": "string",
+                    "description": "HH:mm local start window.",
+                    "is_system_provided": false,
+                    "dynamic_variable": "",
+                    "constant_value": ""
+                  },
+                  "end_local": {
+                    "type": "string",
+                    "description": "HH:mm local end window.",
+                    "is_system_provided": false,
+                    "dynamic_variable": "",
+                    "constant_value": ""
+                  },
+                  "difficulty": {
+                    "type": "number",
+                    "description": "Difficulty 1-10.",
+                    "is_system_provided": false,
+                    "dynamic_variable": "",
+                    "constant_value": ""
+                  }
+                }
+              },
+              "content_type": "application/json"
+            },
+            "tool_call_sound": "typing"
+          },
+          {
+            "type": "webhook",
+            "name": "delete_habit",
+            "description": "Deactivate a habit from the call.",
+            "response_timeout_secs": 8,
+            "disable_interruptions": true,
+            "force_pre_tool_speech": true,
+            "assignments": [],
+            "tool_call_sound_behavior": "always",
+            "tool_error_handling_mode": "auto",
+            "dynamic_variables": {
+              "dynamicVariablePlaceholders": {}
+            },
+            "execution_mode": "immediate",
+            "api_schema": {
+              "request_headers": {
+                "Content-Type": "application/json",
+                "x-tool-api-key": "{{TOOL_API_KEY}}"
+              },
+              "url": "https://api-production-8bf7.up.railway.app/v1/tools/delete-habit",
+              "method": "POST",
+              "path_params_schema": {},
+              "request_body_schema": {
+                "type": "object",
+                "required": [
+                  "userId",
+                  "habitId"
+                ],
+                "description": "",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "description": "",
+                    "is_system_provided": false,
+                    "dynamic_variable": "user_id",
+                    "constant_value": ""
+                  },
+                  "habit_id": {
+                    "type": "string",
+                    "description": "Habit UUID to deactivate.",
+                    "is_system_provided": false,
+                    "dynamic_variable": "",
+                    "constant_value": ""
+                  },
+                  "habit_title": {
+                    "type": "string",
+                    "description": "Optional title for confirmation.",
                     "is_system_provided": false,
                     "dynamic_variable": "",
                     "constant_value": ""
@@ -407,7 +497,7 @@
             "api_schema": {
               "request_headers": {
                 "Content-Type": "application/json",
-                "x-tool-api-key": "b8ca616325a718d6634728c74bc78c8fa43315e0dfb29c6a"
+                "x-tool-api-key": "{{TOOL_API_KEY}}"
               },
               "url": "https://api-production-8bf7.up.railway.app/v1/tools/reschedule",
               "method": "POST",

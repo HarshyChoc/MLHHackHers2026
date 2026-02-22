@@ -15,7 +15,7 @@
   "api_schema": {
     "request_headers": {
       "Content-Type": "application/json",
-      "x-tool-api-key": "b8ca616325a718d6634728c74bc78c8fa43315e0dfb29c6a"
+      "x-tool-api-key": "{{TOOL_API_KEY}}"
     },
     "url": "https://api-production-8bf7.up.railway.app/v1/tools/reschedule",
     "method": "POST",

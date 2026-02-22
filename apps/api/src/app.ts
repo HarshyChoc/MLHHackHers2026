@@ -170,6 +170,135 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+function parseLocalTime(value: unknown, fallback: string): string {
+  if (typeof value === "string" && /^\d{2}:\d{2}$/.test(value.trim())) {
+    return value.trim();
+  }
+  return fallback;
+}
+
+function plusOneHour(localTime: string): string {
+  const [hh, mm] = localTime.split(":").map((part) => Number(part));
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return "09:00";
+  const mins = (hh * 60 + mm + 60) % (24 * 60);
+  const outH = String(Math.floor(mins / 60)).padStart(2, "0");
+  const outM = String(mins % 60).padStart(2, "0");
+  return `${outH}:${outM}`;
+}
+
+function parseDaysOfWeek(value: unknown): number[] | null {
+  const rawValues = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? value.split(",").map((v) => v.trim())
+      : null;
+  if (!rawValues) return null;
+
+  const parsed = rawValues
+    .map((v) => Number(v))
+    .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+  if (parsed.length === 0) return null;
+  return Array.from(new Set(parsed));
+}
+
+function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.max(min, Math.min(max, Math.trunc(num)));
+}
+
+async function handleToolCreateHabit({
+  request,
+  reply,
+  toolApiKey,
+  aliasName
+}: {
+  request: FastifyRequest;
+  reply: FastifyReply;
+  toolApiKey: string;
+  aliasName?: string;
+}) {
+  if (!assertToolApiKey(request, reply, toolApiKey)) {
+    return;
+  }
+
+  const body = request.body as {
+    user_id?: string;
+    userId?: string;
+    title?: string;
+    habit_title?: string;
+    habitTitle?: string;
+    frequency_kind?: string;
+    frequencyKind?: string;
+    days_of_week?: number[] | string;
+    daysOfWeek?: number[] | string;
+    days_of_week_csv?: string;
+    daysOfWeekCsv?: string;
+    measurement_type?: string;
+    measurementType?: string;
+    target_value?: number;
+    targetValue?: number;
+    unit?: string;
+    difficulty_1_to_10?: number;
+    difficulty?: number;
+    start_local?: string;
+    startLocal?: string;
+    end_local?: string;
+    endLocal?: string;
+  };
+
+  const userId = body.user_id ?? body.userId;
+  const title = (body.habit_title ?? body.habitTitle ?? body.title ?? "").trim();
+  if (!userId || !title) {
+    return sendError(reply, request.id, 400, "VALIDATION_ERROR", "user_id and title are required");
+  }
+
+  const goal = await getActiveGoal(userId);
+  if (!goal) {
+    return sendError(reply, request.id, 404, "NOT_FOUND", "Active goal not found");
+  }
+
+  const freqRaw = String(body.frequency_kind ?? body.frequencyKind ?? "daily").toLowerCase();
+  const frequencyKind = ["daily", "weekdays", "custom"].includes(freqRaw) ? freqRaw : "daily";
+  const daysOfWeek = parseDaysOfWeek(body.days_of_week ?? body.daysOfWeek ?? body.days_of_week_csv ?? body.daysOfWeekCsv);
+
+  const startLocal = parseLocalTime(body.start_local ?? body.startLocal, "08:00");
+  const endLocal = parseLocalTime(body.end_local ?? body.endLocal, plusOneHour(startLocal));
+  const difficulty = clampInt(body.difficulty_1_to_10 ?? body.difficulty, 1, 10, 3);
+  const targetValue = clampInt(body.target_value ?? body.targetValue, 1, 10000, 1);
+  const measurementTypeRaw = String(body.measurement_type ?? body.measurementType ?? "yes_no").toLowerCase();
+  const measurementType = ["yes_no", "count", "duration_minutes"].includes(measurementTypeRaw)
+    ? measurementTypeRaw
+    : "yes_no";
+  const unit = (body.unit ?? "done").trim() || "done";
+
+  const frequency: Record<string, unknown> =
+    frequencyKind === "custom"
+      ? { cadence: "custom", days_of_week: daysOfWeek ?? [1, 2, 3, 4, 5] }
+      : { cadence: frequencyKind };
+
+  const measurement: Record<string, unknown> =
+    measurementType === "yes_no"
+      ? { type: "yes_no", target_value: 1, unit }
+      : { type: measurementType, target_value: targetValue, unit };
+
+  const habit = await createHabit({
+    userId,
+    goal_id: goal.id,
+    title,
+    frequency,
+    measurement,
+    difficulty_1_to_10: difficulty,
+    default_time_window: { start_local: startLocal, end_local: endLocal },
+    active: true
+  });
+
+  return reply.code(201).send({
+    ...habit,
+    created_via: aliasName ?? "create_habit_tool"
+  });
+}
+
 async function buildDashboard(userId: string, dateLocal: string): Promise<DashboardTodayResponse> {
   const user = await getUserById(userId);
   if (!user) {
@@ -354,21 +483,6 @@ async function executeCoachActions(params: {
               }
             : undefined
       });
-
-      if (scheduleType === "call") {
-        const hasUpcoming = await hasScheduledCheckinInNextWindow({
-          user_id: params.userId,
-          type: "call",
-          window_hours: 24
-        });
-        if (!hasUpcoming) {
-          await createCheckinEvent({
-            user_id: params.userId,
-            scheduled_at_utc: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-            type: "call"
-          });
-        }
-      }
 
       executed.push({
         type: "schedule_upserted",
@@ -722,22 +836,6 @@ export function createApp() {
           retry_policy: body.retry_policy
         });
 
-        if (body.type === "call") {
-          const hasUpcoming = await hasScheduledCheckinInNextWindow({
-            user_id: user.id,
-            type: "call",
-            window_hours: 24
-          });
-          if (!hasUpcoming) {
-            const initialCheckinAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-            await createCheckinEvent({
-              user_id: user.id,
-              scheduled_at_utc: initialCheckinAt,
-              type: "call"
-            });
-          }
-        }
-
         return savedSchedule;
       });
 
@@ -770,21 +868,6 @@ export function createApp() {
 
         if (!updated) {
           return sendError(reply, request.id, 404, "NOT_FOUND", "Schedule not found");
-        }
-
-        if (updated.type === "call") {
-          const hasUpcoming = await hasScheduledCheckinInNextWindow({
-            user_id: user.id,
-            type: "call",
-            window_hours: 24
-          });
-          if (!hasUpcoming) {
-            await createCheckinEvent({
-              user_id: user.id,
-              scheduled_at_utc: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-              type: "call"
-            });
-          }
         }
 
         return updated;
@@ -891,14 +974,25 @@ export function createApp() {
           content: body.message
         });
 
-        const [activeGoal, summaryFields, recentMessages, schedules] = await Promise.all([
+        const dateLocal = todayLocalISO();
+
+        const [activeGoal, summaryFields, recentMessages, schedules, logsForToday] = await Promise.all([
           getActiveGoal(user.id),
           getSummaryFields(user.id),
           listRecentMessagesByThread({ user_id: user.id, thread_id: body.thread_id, limit: 12 }),
-          listSchedulesForUser(user.id)
+          listSchedulesForUser(user.id),
+          listHabitLogsForDate(user.id, dateLocal)
         ]);
 
         const habits = activeGoal ? await listHabitsForGoal(user.id, activeGoal.id) : [];
+        const todayHabits = habits.map((habit) => {
+          const log = logsForToday.find((entry) => entry.habit_id === habit.id);
+          return {
+            habit_id: habit.id,
+            title: habit.title,
+            status: (log?.status ?? "pending") as "pending" | "done" | "partial" | "missed" | "skipped"
+          };
+        });
 
         const completion = await generateCoachCompletion({
           userTimezone: user.timezone,
@@ -908,6 +1002,7 @@ export function createApp() {
           rollingSummary: summaryFields.rolling_summary,
           recentMessages,
           availableHabits: habits,
+          todayHabits,
           schedules,
           phoneVerified: user.phone_verified,
           phoneNumber: user.phone_e164,
@@ -1149,7 +1244,16 @@ export function createApp() {
         return reply.code(201).send(blocker);
       });
 
+      v1.post("/tools/create-habit", async (request, reply) => {
+        return handleToolCreateHabit({ request, reply, toolApiKey });
+      });
+
+      // Backward-compat alias: repurposed from commitments to habit creation for phone calls.
       v1.post("/tools/set-commitment", async (request, reply) => {
+        return handleToolCreateHabit({ request, reply, toolApiKey, aliasName: "set_commitment_alias" });
+      });
+
+      v1.post("/tools/delete-habit", async (request, reply) => {
         if (!assertToolApiKey(request, reply, toolApiKey)) {
           return;
         }
@@ -1157,25 +1261,48 @@ export function createApp() {
         const body = request.body as {
           user_id?: string;
           userId?: string;
-          commitment_text?: string;
-          commitmentText?: string;
-          due_date_local?: string;
-          dueDateLocal?: string;
+          habit_id?: string;
+          habitId?: string;
+          habit_title?: string;
+          habitTitle?: string;
+          title?: string;
         };
+
         const userId = body.user_id ?? body.userId;
-        const commitmentText = body.commitment_text ?? body.commitmentText;
-        const dueDateLocal = body.due_date_local ?? body.dueDateLocal;
-        if (!userId || !commitmentText || !dueDateLocal) {
-          return sendError(reply, request.id, 400, "VALIDATION_ERROR", "user_id, commitment_text, due_date_local are required");
+        const habitId = body.habit_id ?? body.habitId;
+        const habitTitle = (body.habit_title ?? body.habitTitle ?? body.title ?? "").trim();
+        if (!userId || (!habitId && !habitTitle)) {
+          return sendError(reply, request.id, 400, "VALIDATION_ERROR", "user_id and habit_id or habit_title are required");
         }
 
-        const commitment = await createCommitment({
-          user_id: userId,
-          text: commitmentText,
-          due_date_local: dueDateLocal
+        let habit = habitId ? await getHabitByIdForUser(habitId, userId) : null;
+        if (!habit && habitTitle) {
+          const habits = await listHabitsForUser({ userId, includeInactive: false });
+          habit =
+            habits.find((item) => item.title.trim().toLowerCase() === habitTitle.toLowerCase()) ??
+            null;
+        }
+
+        if (!habit) {
+          return sendError(reply, request.id, 404, "NOT_FOUND", "Habit not found");
+        }
+
+        const updated = await updateHabit({
+          habitId: habit.id,
+          userId,
+          patch: { active: false }
         });
 
-        return reply.code(201).send(commitment);
+        if (!updated) {
+          return sendError(reply, request.id, 404, "NOT_FOUND", "Habit not found");
+        }
+
+        return {
+          habit_id: updated.id,
+          title: updated.title,
+          active: updated.active,
+          deleted: true
+        };
       });
 
       v1.post("/tools/reschedule", async (request, reply) => {

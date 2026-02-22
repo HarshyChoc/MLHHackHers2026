@@ -4,6 +4,7 @@ import {
   closeWorkerDb,
   getCallRetryPolicy,
   getUserCallablePhone,
+  materializeUpcomingCallCheckins,
   markCheckinCompleted,
   markCheckinDispatched,
   markCheckinFailed,
@@ -23,6 +24,7 @@ const connection = {
 const CHECKIN_QUEUE = "checkin";
 const REVIEW_QUEUE = "weekly-review";
 const CLAIM_BATCH_SIZE = Number(process.env.CHECKIN_CLAIM_BATCH_SIZE ?? 20);
+const MATERIALIZE_DAYS_AHEAD = Number(process.env.CHECKIN_MATERIALIZE_DAYS_AHEAD ?? 14);
 
 type PlaceCallJob = {
   checkin_event_id: string;
@@ -49,6 +51,11 @@ new QueueEvents(CHECKIN_QUEUE, { connection });
 new QueueEvents(REVIEW_QUEUE, { connection });
 
 async function checkinTick(): Promise<void> {
+  const materialized = await materializeUpcomingCallCheckins(MATERIALIZE_DAYS_AHEAD);
+  if (materialized > 0) {
+    console.log(`[checkin_tick] materialized ${materialized} future check-ins`);
+  }
+
   const dueEvents = await claimDueCheckins(CLAIM_BATCH_SIZE);
   if (dueEvents.length === 0) {
     return;
@@ -219,9 +226,15 @@ async function start(): Promise<void> {
     { connection }
   );
 
-  await checkinTick();
+  try {
+    await checkinTick();
+  } catch (error) {
+    console.error("[checkin_tick] initial run failed", error);
+  }
   const interval = setInterval(() => {
-    void checkinTick();
+    void checkinTick().catch((error) => {
+      console.error("[checkin_tick] interval run failed", error);
+    });
   }, 60_000);
 
   console.log("Worker started");

@@ -26,6 +26,11 @@ interface ChatContextInput {
   rollingSummary: string | null;
   recentMessages: Array<{ role: "user" | "assistant"; content: string }>;
   availableHabits: Habit[];
+  todayHabits: Array<{
+    habit_id: string;
+    title: string;
+    status: "pending" | "done" | "partial" | "missed" | "skipped";
+  }>;
   schedules: Schedule[];
   phoneVerified: boolean;
   phoneNumber: string | null;
@@ -123,6 +128,7 @@ function buildSystemPrompt(): string {
     "- For schedule_suggested payload (used as schedule upsert tool action): include type(call|chat), windows(array), cadence(object), retry_policy(optional object). Only emit when user explicitly asks to create/change schedule.",
     "- For checkin_event_created payload: include type(call|chat) and optionally scheduled_at_utc (ISO timestamp). Use only when user explicitly asks to trigger a call/check-in now or at a specific time.",
     "- Do not invent habit IDs. Use only provided habit IDs.",
+    "- When asked about what was completed today, use context.today_habits statuses as source of truth.",
     "Tone rules:",
     "- Keep assistant_message concise, direct, and supportive.",
     "- Include one concrete next step."
@@ -149,6 +155,7 @@ export async function generateCoachCompletion(input: ChatContextInput): Promise<
       last_call_recap: input.lastCallRecap,
       rolling_summary: input.rollingSummary,
       habits: habitReference,
+      today_habits: input.todayHabits,
       schedules: input.schedules,
       phone_verified: input.phoneVerified,
       phone_e164: input.phoneNumber,
